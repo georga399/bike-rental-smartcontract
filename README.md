@@ -21,7 +21,7 @@ The system is built around several smart contracts (templates) that represent bo
 Install [DAML SDK](https://docs.daml.com/getting-started/installation.html).
 
 ## Getting started
-1. Clone repo:
+1. Clone the repo:
     ```sh
     git clone https://github.com/georga399/bike-rental-smartcontract
     ```
