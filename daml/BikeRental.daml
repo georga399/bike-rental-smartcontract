@@ -1,0 +1,69 @@
+module BikeRental where
+
+template Bike
+  with
+    bikeId: Text
+    provider: Party
+  where
+    ensure bikeId /= ""
+    signatory provider
+
+    key (provider, bikeId) : (Party, Text)
+    maintainer key._1
+
+    choice RentProposal: ContractId BikeRentalProposal
+      with
+        customer : Party
+      controller provider
+      do 
+        create BikeRentalProposal with
+          bike = this
+          provider = provider
+          customer = customer
+
+template BikeRentalProposal
+  with 
+    bike: Bike
+    provider: Party
+    customer: Party
+  where 
+    signatory provider
+    observer customer
+    
+    choice Accept_Proposal: ContractId BikeRentalAgreement
+      controller customer
+      do
+        create BikeRentalAgreement with
+          bike = this.bike
+          provider = provider
+          customer = customer
+
+    choice Reject_Proposal: ()
+      controller customer
+      do
+        create bike
+        return ()
+
+    choice Expire_Proposal: ()
+      controller provider
+      do
+        create bike
+        return ()
+
+template BikeRentalAgreement
+  with 
+    bike: Bike
+    provider: Party
+    customer: Party
+  where 
+    signatory customer, provider
+
+    choice Close_Agreement: ContractId Bike
+      controller customer
+      do
+        create bike
+    
+    choice Expire_Agreement: ContractId Bike
+      controller provider
+      do
+        create bike    

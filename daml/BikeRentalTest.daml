@@ -1,0 +1,89 @@
+module BikeRentalTest where
+
+import BikeRental
+import Daml.Script
+import DA.Assert
+
+testBikeRental_main_scenario : Script ()
+testBikeRental_main_scenario = do
+
+  provider <- allocateParty "BikeProvider"
+  customer <- allocateParty "Alice"
+
+  bikeCid <- submit provider do
+    createCmd Bike with
+      bikeId = "bike-123"
+      provider = provider
+
+  proposalCid <- submit provider do
+    exerciseCmd bikeCid RentProposal with
+      customer = customer
+
+  agreementCid <- submit customer do
+    exerciseCmd proposalCid Accept_Proposal
+
+  returnedBikeCid <- submit customer do
+    exerciseCmd agreementCid Close_Agreement
+  
+  Some returnedBike <- queryContractId provider returnedBikeCid
+  returnedBike.bikeId === "bike-123"
+
+  debug $ returnedBikeCid
+
+  return ()
+
+testBikeRental_reject_scenario : Script ()
+testBikeRental_reject_scenario = script do
+  provider <- allocateParty "BikeProviderReject"
+  customer <- allocateParty "Bob"
+
+  bikeCid <- submit provider do 
+    createCmd Bike with 
+      bikeId = "bike-456", provider
+  proposalCid <- submit provider do 
+    exerciseCmd bikeCid RentProposal with 
+      customer
+
+  submit customer do
+    exerciseCmd proposalCid Reject_Proposal
+
+  -- Check: contract Bike should be recreated
+  -- We can find by key.
+  Some (returnedBikeCid, returnedBikeData) <- queryContractKey @Bike provider (provider, "bike-456")
+  returnedBikeData.bikeId === "bike-456"
+  returnedBikeData.provider === provider
+  debug $ "Bike was returned to the provider. CID: " <> show returnedBikeCid
+  return ()
+
+testBikeRental_expire_scenario : Script ()
+testBikeRental_expire_scenario = script do
+  provider <- allocateParty "BikeProviderExpire"
+  customer <- allocateParty "Charlie"
+
+  bikeCid <- submit provider do createCmd Bike with bikeId = "bike-789", provider
+  proposalCid <- submit provider do exerciseCmd bikeCid RentProposal with customer
+
+  submit provider do
+    exerciseCmd proposalCid Expire_Proposal
+
+  -- Check: contract Bike should be recreated
+  -- We can find by key.
+  Some (returnedBikeCid, returnedBikeData) <- queryContractKey @Bike provider (provider, "bike-789")  
+  returnedBikeData.bikeId === "bike-789"
+  debug $ "Bike was returned to the provider. CID: " <> show returnedBikeCid
+  return ()
+
+test : Script ()
+test = script do
+  debug "--- Run main scenario ---"
+  testBikeRental_main_scenario
+  debug "--- Main scenario was completed ---"
+  
+  debug "--- Run reject scenario ---"
+  testBikeRental_reject_scenario
+  debug "--- Reject scenario was completed ---"
+
+  debug "--- Run expire scenario ---"
+  testBikeRental_expire_scenario
+  debug "--- Expire scenario was completed ---"
+
